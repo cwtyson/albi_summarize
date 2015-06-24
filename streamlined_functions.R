@@ -1,3 +1,22 @@
+library(dplyr)
+library(sp)
+library(rgdal)
+library(geosphere)
+library(CircStats)
+library(circular)
+library(adehabitat)
+library(adehabitatLT)
+library(adehabitatHR)
+library(adehabitatHS)
+library(adehabitatMA)
+library(foreach)
+library(doSNOW)
+library(doParallel)
+library(raster)
+
+
+
+
 resample <- function(Data, setTZ, res, WD, outWD){
   
   VARLIST<-c("X.Latitude","X.Longitude","X.Speed","Uplift","SWH","Charn","Bathy","Dist_to_coast","X10MWind",
@@ -23,7 +42,7 @@ resample <- function(Data, setTZ, res, WD, outWD){
   M2<-sett0(M2,refda,10,tol=10,units="sec")
   
   ## Resample to desired resolution
-  M2<-subsample(M2,res)
+  M2<-adehabitat::subsample(M2,res)
   
   X2<-tbl_df(data.frame(M2))
   X2time<-as.POSIXct(X2$date,"%Y-%m-%d %H:%M:%S",tz=setTZ)
@@ -188,9 +207,9 @@ circMean<-function(input){
 }
 
 
-Summarize.at.point<-function(Index,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,resTTIME,NPoints,SubSamp,Theta,StepSize,TurnSens, species, timezone){
+Summarize.at.point<-function(Index,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,resTTIME,NPoints,SubSamp,Theta,StepSize,TurnSens, species, timezone,outWD){
   #   WS<-"C:/Users/Grant/Dropbox/Grant_Michelle/Albatross/BBAL/Bird_Tracks_Annotated_Plus_Type/resampled_tracks/"
-  setwd(WS)
+  
   
   ## Set timezone
   setTZ <- ifelse(timezone == 1,"Indian/Maldives",ifelse(timezone == 2,"Indian/Mahe", stop("No time zone set") ))
@@ -203,7 +222,11 @@ Summarize.at.point<-function(Index,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,r
   
   BirdName<-paste("Bird_",substr(Data,gregexpr(pattern="_",Data)[[1]][1]+1,gregexpr(pattern="_",Data)[[1]][2]-1),sep="")
   
-  X<-tbl_df(read.table(Data,sep=",",header=T))
+  
+  FREAD<-paste(outWD, "/resampled_", res, "_sec/",Data, sep="")
+  
+  
+  X<-tbl_df(read.table(FREAD,sep=",",header=T))
   X$ID<-species
   
   Tm<-as.POSIXct(strptime(X$LocalDateTime,format="%Y-%m-%d %H:%M:%S",tz=setTZ),format ="%Y-%m-%d %H:%M:%S",tz=setTZ)
@@ -566,8 +589,8 @@ Summarize.at.point<-function(Index,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,r
       
       
       start<-end+1
-      remove(nstart)
-      remove(nen)
+      #remove(nstart)
+      #remove(nend)
     }
     
   }
@@ -578,7 +601,7 @@ Summarize.at.point<-function(Index,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,r
 }
 
 
-streamlined <- function (WD, outWD, Resamp, timezone, species, resample = T, summarize = T, filePattern) {
+streamlined <- function (WD, outWD, Resamp, timezone, species, resmp = 1, summarize = 1, filePattern) {
   
   ## Argument descriptions:
   ## WD - workspace (character string, not ending with with a "/")
@@ -586,7 +609,7 @@ streamlined <- function (WD, outWD, Resamp, timezone, species, resample = T, sum
   ## Resamp - desired resampling interval in seconds (integer)
   ## timezone - 1 = "Indian/Maldives", 2 = "Indian/Mahe" (integer)
   ## species - species code to be added to the data frame (e.g. BBAL, WAAL) (character string)
-  ## resample - resample the data? (1 = yes)
+  ## resmp - resample the data? (1 = yes)
   ## summarize - summarize the data? (1 = yes)
   ## filePattern - character sequence used to pick out files in workspace (e.g. "GPS") (character string)
   
@@ -597,7 +620,7 @@ streamlined <- function (WD, outWD, Resamp, timezone, species, resample = T, sum
   ## Set timezone
   setTZ <- ifelse(timezone == 1,"Indian/Maldives",ifelse(timezone == 2,"Indian/Mahe", stop("No time zone set") ))
   
-  if(resample == 1)
+  if(resmp == 1)
   {  
     
     ## For each desired resolution, resample each 
@@ -659,11 +682,11 @@ streamlined <- function (WD, outWD, Resamp, timezone, species, resample = T, sum
         TurnSens<-60
         
         # Call summarize.at.point function
-        d<-foreach(Index=SEQ,.combine='rbind',.errorhandling = 'remove')%dopar%{
-          #for(Index in SEQ){
+        d<-foreach(Index=SEQ,.combine='rbind',.errorhandling = 'remove',.packages=c('dplyr','raster','rgdal','sp','adehabitat','adehabitatLT','geosphere'))%dopar%{    #
+        #for(Index in SEQ){
           #print(Index)
           #writeLines(as.character(Index),"C:/Temp/log.txt")
-          Summarize.at.point(Index,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,resTTIME,NPoints,SubSamp,Theta,StepSize,TurnSens,species, timezone)
+          Summarize.at.point(Index,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,resTTIME,NPoints,SubSamp,Theta,StepSize,TurnSens,species, timezone,outWD)
         }
         
         NewDat<-bird[d[,"Eindex"],]
