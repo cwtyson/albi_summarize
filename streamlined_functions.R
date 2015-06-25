@@ -74,11 +74,13 @@ resample <- function(Data, setTZ, res, WD, outWD){
     if(tt %% 100 == 0){print(paste(tt," of ",nrow(X2)," rows",sep=""))}
     
     X2.T<-strptime(X2$date[tt],"%Y-%m-%d %H:%M:%S",tz=setTZ)
-    
-    
+        
     ## Get points within the average resolution of points in the track
     Index<-which(X.T >= X2.T-res.avg & X.T <= X2.T+res.avg)[1]
-    ROW<-data.frame(LocalDateTime=as.character(X2.T),X.event=0,X[Index,VARLIST])
+    
+    #print(Index)
+    
+    ROW<-data.frame(LocalDateTime=X2.T,X.event=0,X[Index,VARLIST])
     
     X3<-rbind(X3,ROW)
   }
@@ -106,6 +108,7 @@ resample <- function(Data, setTZ, res, WD, outWD){
   }
   
   Tm3<-as.POSIXct(strptime(Trck$LocalDateTime,format="%Y-%m-%d %H:%M:%S",tz=setTZ),format ="%Y-%m-%d %H:%M:%S",tz=setTZ)
+  
   Z3<-project(cbind(Trck$X.Longitude,Trck$X.Latitude), "+proj=utm +zone=42 ellps=WGS84")    
   M3<-data.frame(as.ltraj(Z3,Tm3,"id"))
   

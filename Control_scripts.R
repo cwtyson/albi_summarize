@@ -4,7 +4,7 @@ source('C:/Users/Grant/Dropbox/GrantHumphriesBackup/Projects/Albatross/Codes/alb
 WorDir<-"C:/Users/Grant/Dropbox/GrantHumphriesBackup/Projects/Albatross/BBAL/individuals/"
 outDir<-"C:/Temp"
 filePattern="GPS"
-Resamp<-120
+Resamp<-180
 timezone<-1
 species<-"BBAL"
 resmp<-1
