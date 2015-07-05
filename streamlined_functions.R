@@ -15,15 +15,13 @@ library(doParallel)
 library(raster)
 
 
-
-
-resample <- function(Data, setTZ, res, WD, outWD){
+resample <- function(Data, setTZ, Res, WD, outWD){
   
   VARLIST<-c("X.Latitude","X.Longitude","X.Speed","Uplift","SWH","Charn","Bathy","Dist_to_coast","X10MWind",
              "MWD","SST","SLP","MWP","MetWind","WindDifferential","WindDirToFlight","Period")
   
   X<-tbl_df(read.table(paste(WD, "/", Data, sep=""), sep=",",header=T))
-  X$WindDirToFlight<-X$WindDirs
+  #X$WindDirToFlight<-X$WindDirs
   
   #   GMTtime<-as.POSIXct(strptime(paste(X$X.Date,X$X.Time),format="%d-%m-%Y %H:%M:%S",tz="GMT"),format ="%Y-%m-%d %H:%M:%S",tz="GMT")
   #   attributes(GMTtime)$tzone<-"Indian/Maldives"
@@ -42,7 +40,7 @@ resample <- function(Data, setTZ, res, WD, outWD){
   M2<-sett0(M2,refda,10,tol=10,units="sec")
   
   ## Resample to desired resolution
-  M2<-adehabitat::subsample(M2,res)
+  M2<-adehabitat::subsample(M2,Res)
   
   X2<-tbl_df(data.frame(M2))
   X2time<-as.POSIXct(X2$date,"%Y-%m-%d %H:%M:%S",tz=setTZ)
@@ -152,13 +150,13 @@ resample <- function(Data, setTZ, res, WD, outWD){
   ################################################################################
   
   ## Create folder (if it doesn't exist) for the current resampled resolution
-  if (!file.exists(paste(outWD, "/resampled_", res, "_sec/", sep = "")))
+  if (!file.exists(paste(outWD, "/resampled_", Res, "_sec/", sep = "")))
   {
-    dir.create(paste(outWD, "/resampled_", res, "_sec/", sep = "")) # Create directory if it does not exist   
+    dir.create(paste(outWD, "/resampled_", Res, "_sec/", sep = "")) # Create directory if it does not exist   
   }
   
   ## Name of output file
-  Outname<-paste(outWD, "/resampled_", res, "_sec/", substr(Data,1,nchar(Data)-4),"_Output.txt", sep="")      
+  Outname<-paste(outWD, "/resampled_", Res, "_sec/", substr(Data,1,nchar(Data)-4),"_Output.txt", sep="")      
   
   print(paste("Table for ",substr(Data,1,(nchar(Data)-10))," now being written...",sep=""))
   print("-------")
@@ -210,15 +208,13 @@ circMean<-function(input){
 }
 
 
-Summarize.at.point<-function(Index,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,resTTIME,NPoints,SubSamp,Theta,StepSize,TurnSens, species, timezone,outWD){
-  #   WS<-"C:/Users/Grant/Dropbox/Grant_Michelle/Albatross/BBAL/Bird_Tracks_Annotated_Plus_Type/resampled_tracks/"
-  
-  
+Summarize.at.point<-function(Index,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,resTTIME,NPoints,SubSamp,Theta,StepSize,TurnSens,species,timezone,outWD){
+    
   ## Set timezone
   setTZ <- ifelse(timezone == 1,"Indian/Maldives",ifelse(timezone == 2,"Indian/Mahe", stop("No time zone set") ))
   
-  #Index<-630
-  #Data<-"BBAL_A_GPS_Resampled_120.txt"
+  if(Index<NPoints) stop("Index too close to beginning of track...")
+  
   Eindex<-Index
   
   SumMat<-matrix(ncol=41+(StepSize*5))
@@ -226,7 +222,7 @@ Summarize.at.point<-function(Index,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,r
   BirdName<-paste("Bird_",substr(Data,gregexpr(pattern="_",Data)[[1]][1]+1,gregexpr(pattern="_",Data)[[1]][2]-1),sep="")
   
   
-  FREAD<-paste(outWD, "/resampled_", res, "_sec/",Data, sep="")
+  FREAD<-paste(outWD, "/resampled_", Res, "_sec/",Data, sep="")
   
   
   X<-tbl_df(read.table(FREAD,sep=",",header=T))
@@ -627,7 +623,7 @@ streamlined <- function (WD, outWD, Resamp, timezone, species, resmp = 1, summar
   {  
     
     ## For each desired resolution, resample each 
-    for(res in Resamp){
+    for(Res in Resamp){
       
       #       res <- Resamp[1]
       
@@ -637,7 +633,7 @@ streamlined <- function (WD, outWD, Resamp, timezone, species, resmp = 1, summar
         #         Data <- BirdList[1]
         
         ## For each data.frame, resample
-        resample(Data, setTZ, res, WD, outWD)
+        resample(Data, setTZ, Res, WD, outWD)
         
       }
     }
@@ -649,10 +645,10 @@ streamlined <- function (WD, outWD, Resamp, timezone, species, resmp = 1, summar
   {
     
     ## For each desired resolution, resample each 
-    for(res in Resamp){
+    for(Res in Resamp){
       
       ## Get output directory for current resolution
-      resDir <- paste(outWD, "/resampled_", res, "_sec/", sep ="")
+      resDir <- paste(outWD, "/resampled_", Res, "_sec/", sep ="")
       
       BirdList2<-dir(resDir, pattern = filePattern)
       
