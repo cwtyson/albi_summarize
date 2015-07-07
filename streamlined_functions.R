@@ -160,7 +160,7 @@ resample <- function(Data, setTZ, Res, WD, outWD){
   
   print(paste("Table for ",substr(Data,1,(nchar(Data)-10))," now being written...",sep=""))
   print("-------")
-  write.table(Trck,Outname,sep=",",row.names=F)
+  write.table(Trck,Outname,sep=",",row.names=FALSE)
   print("complete...")
   
 }
@@ -669,8 +669,8 @@ streamlined <- function (WD, outWD, Resamp, timezone, species, resmp = 1, summar
         
         ## Hard coded arguments
         TmBuff<-1300
-        DistBuff<-15000   #### AT 120 sec resolution, only capturing a few points because birds are flying fast! 
-        EndDist<-10000
+        DistBuff<-25000   #### AT 120 sec resolution, only capturing a few points because birds are flying fast! 
+        EndDist<-20000
         fptRad<-5000    
         resTRad<-500
         resTTIME<-50
@@ -702,7 +702,7 @@ streamlined <- function (WD, outWD, Resamp, timezone, species, resmp = 1, summar
         name<-paste(resDir, "/summarized/", substr(Data,1,nchar(Data)-4),"_Output.txt", sep="")
         
         ## Write to folder
-        write.table(MM,name,sep=",")
+        write.table(MM,name,sep=",",row.names=F)
         
       }
       
