@@ -48,12 +48,6 @@ resample <- function(Data, setTZ, Res, WD, outWD){
   
   X.T<-strptime(X$LocalDateTime,"%Y-%m-%d %H:%M:%S",tz=setTZ)
   
-  ## Get average time difference between first 10% of points
-  t1 <- head(X.T, -1)
-  t2 <- tail(X.T, -1)
-  
-  res.avg <- mean(as.numeric(difftime(t2,t1, units = "secs")[1:round(length(X.T)/10)]))
-  
   X3<-matrix(nrow=0,ncol=19,byrow=TRUE)
   colnames(X3)<-c("LocalDateTime","X.event",VARLIST)
   
@@ -74,8 +68,9 @@ resample <- function(Data, setTZ, Res, WD, outWD){
     X2.T<-strptime(X2$date[tt],"%Y-%m-%d %H:%M:%S",tz=setTZ)
         
     ## Get points within the average resolution of points in the track
-    Index<-which(X.T >= X2.T-res.avg & X.T <= X2.T+res.avg)[1]
-    
+
+    alldiff<-abs(difftime(X2.T,X.T))
+    Index<-which(alldiff==min(alldiff))
     #print(Index)
     
     ROW<-data.frame(LocalDateTime=X2.T,X.event=0,X[Index,VARLIST])
@@ -140,7 +135,8 @@ resample <- function(Data, setTZ, Res, WD, outWD){
   for(j in EvIndices){
     #print(j)
     EvTime<-X.T[j]
-    Event<-which(X2.Tm >= EvTime - 60 & X2.Tm <= EvTime + 60)
+    alldiff<-abs(difftime(EvTime,X2.Tm))
+    Event<-which(alldiff==min(alldiff))
     Trck$X.event[Event]<-1
   }
   
@@ -600,13 +596,13 @@ Summarize.at.point<-function(Index,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,r
 }
 
 
-streamlined <- function (WD, outWD, Resamp, timezone, species, resmp = 1, summarize = 1, filePattern) {
+streamlined <- function (WD, outWD, Res, timezone, species, resmp = 1, summarize = 1, filePattern) {
   
   ## Argument descriptions:
   ## WD - workspace (character string, not ending with with a "/")
   ## outWD - output directory (character string, not ending with with a "/")
   ## Resamp - desired resampling interval in seconds (integer)
-  ## timezone - 1 = "Indian/Maldives", 2 = "Indian/Mahe" (integer)
+  ## timezone - 1 = "Indian/Maldives", 2 = "Indian/Mahe" (integer)  ### BBAL = Maldives
   ## species - species code to be added to the data frame (e.g. BBAL, WAAL) (character string)
   ## resmp - resample the data? (1 = yes)
   ## summarize - summarize the data? (1 = yes)
@@ -621,95 +617,81 @@ streamlined <- function (WD, outWD, Resamp, timezone, species, resmp = 1, summar
   
   if(resmp == 1)
   {  
-    
-    ## For each desired resolution, resample each 
-    for(Res in Resamp){
-      
-      #       res <- Resamp[1]
-      
-      ## For each data.frame resample at current resolution
-      for(Data in BirdList){
-        
-        #         Data <- BirdList[1]
-        
-        ## For each data.frame, resample
-        resample(Data, setTZ, Res, WD, outWD)
-        
-      }
+    ## For each data.frame resample at current resolution
+    for(Data in BirdList){
+      ## For each data.frame, resample
+      resample(Data, setTZ, Res, WD, outWD)
     }
-    
   }
   
   ## If summarize option has been selected, then summarize each resampled data frame
   if(summarize == 1)
   {
     
-    ## For each desired resolution, resample each 
-    for(Res in Resamp){
+    ## Get output directory for current resolution
+    resDir <- paste(outWD, "/resampled_", Res, "_sec/", sep ="")
+    
+    BirdList2<-dir(resDir, pattern = filePattern)
+    
+    ## Establish and register clusters
+    cl<-makeCluster(5, outfile="")
+    registerDoSNOW(cl)
+    
+    ## For each data.frame in current resampled folder: summarize at point
+    for(Data in BirdList2){
       
-      ## Get output directory for current resolution
-      resDir <- paste(outWD, "/resampled_", Res, "_sec/", sep ="")
+      #     Data<-BirdList2[1]
       
-      BirdList2<-dir(resDir, pattern = filePattern)
+      print(Data)
+      bird<-read.table(paste(resDir, Data, sep = ""), sep=",",header=T)
+      #writeLines(c(""),"C:/Temp/log.txt")
       
-      ## Establish and register clusters
-      cl<-makeCluster(7, outfile="")
-      registerDoSNOW(cl)
+      SEQ<-seq(10,nrow(bird),by=1)
       
-      ## For each data.frame in current resampled folder: summarize at point
-      for(Data in BirdList2){
-        
-        #     Data<-BirdList2[1]
-        
-        print(Data)
-        bird<-read.table(paste(resDir, Data, sep = ""), sep=",",header=T)
-        #writeLines(c(""),"C:/Temp/log.txt")
-        
-        SEQ<-seq(10,nrow(bird),by=1)
-        
-        ## Hard coded arguments
-        TmBuff<-1300
-        DistBuff<-25000   #### AT 120 sec resolution, only capturing a few points because birds are flying fast! 
-        EndDist<-20000
-        fptRad<-5000    
-        resTRad<-500
-        resTTIME<-50
-        NPoints <-9
-        SubSamp<-120
-        Theta<-0.7
-        StepSize<-2
-        TurnSens<-60
-        
-        # Call summarize.at.point function
-        d<-foreach(Index=SEQ,.combine='rbind',.errorhandling = 'remove',.packages=c('dplyr','raster','rgdal','sp','adehabitat','adehabitatLT','geosphere'))%dopar%{    #
+      ## Hard coded arguments
+      TmBuff<-1300
+      DistBuff<-15000   #### AT 120 sec resolution, only capturing a few points because birds are flying fast! 
+      EndDist<-20000
+      fptRad<-5000    
+      resTRad<-500
+      resTTIME<-50
+      NPoints <-9
+      SubSamp<-120
+      Theta<-0.7
+      StepSize<-2
+      TurnSens<-60
+      #
+      # Call summarize.at.point function
+      d<-foreach(Index=SEQ,.combine='rbind',.verbose=TRUE,.errorhandling = 'remove',.packages=c('dplyr','raster','rgdal','sp','adehabitat','adehabitatLT','geosphere'))%dopar%{    #
         #for(Index in SEQ){
-          #print(Index)
-          #writeLines(as.character(Index),"C:/Temp/log.txt")
-          Summarize.at.point(Index,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,resTTIME,NPoints,SubSamp,Theta,StepSize,TurnSens,species, timezone,outWD)
-        }
-        
-        NewDat<-bird[d[,"Eindex"],]
-        
-        MM<-cbind(NewDat,d)
-        
-        ## Create "summarized" folder in output directory if it doesn't exist
-        if (!file.exists(paste(resDir, "/summarized/", sep="")))
-        {
-          dir.create(paste(resDir, "/summarized/", sep=""))
-        }
-        
-        ## Name of output directory.
-        name<-paste(resDir, "/summarized/", substr(Data,1,nchar(Data)-4),"_Output.txt", sep="")
-        
-        ## Write to folder
-        write.table(MM,name,sep=",",row.names=F)
-        
+        #print(Index)
+        #writeLines(as.character(Index),"C:/Temp/log.txt")
+        cat(as.character(Index),"\n")
+        Summarize.at.point(Index,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,resTTIME,NPoints,SubSamp,Theta,StepSize,TurnSens,species, timezone,outWD)
       }
       
-      ## Terminate SNOW cluster
-      stopCluster(cl)
+      NewDat<-bird[d[,"Eindex"],]
+      
+      MM<-cbind(NewDat,d)
+      
+      ## Create "summarized" folder in output directory if it doesn't exist
+      if (!file.exists(paste(resDir, "/summarized/", sep="")))
+      {
+        dir.create(paste(resDir, "/summarized/", sep=""))
+      }
+      
+      ## Name of output directory.
+      name<-paste(resDir, "/summarized/", substr(Data,1,nchar(Data)-4),"_Output.txt", sep="")
+      
+      ## Write to folder
+      write.table(MM,name,sep=",",row.names=F)
       
     }
+    
+    ## Terminate SNOW cluster
+    stopCluster(cl)
+    
+    
     
   }
   

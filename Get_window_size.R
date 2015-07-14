@@ -33,11 +33,11 @@ SubSamp<-120
 Theta<-0.7
 StepSize<-2
 TurnSens<-60
-species<-"BBAL"          #BBAL
+species<-"wAAL"          #BBAL
 Timezone<-1              # 1 is for BBAL
-outWS<-"C:/Users/Grant/Dropbox/GrantHumphriesBackup/Projects/Albatross/BBAL/analysis/"
+outWS<-"C:/Users/Grant/Dropbox/GrantHumphriesBackup/Projects/Albatross/WAAL/analysis/"
 
-Res<-120
+Res<-10
 #DistBuff<-5000
 #EndDist<-5000
 
@@ -51,6 +51,9 @@ DistBuffs<-c(5000,8000,10000,12000,15000,20000,25000,30000,40000,50000)
 filenames=list.files(path=GETdir, pattern="*.txt",full.names=TRUE)
 datalist = lapply(filenames, function(x){read.table(file=x,sep=",",header=T)})
 filenames=list.files(path=GETdir, pattern="*.txt")
+
+cl<-makeCluster(7, outfile="")
+registerDoSNOW(cl)
 
 
 for(XX in 1:100){
@@ -66,9 +69,13 @@ for(XX in 1:100){
     for(k in datalist){
       
       Data<-filenames[count]
+      
+      print(Data)
       events<-which(k$X.event==1)
       
-      Events<-foreach(x=events,.combine='rbind',.errorhandling='remove') %do% {
+      Events<-foreach(x=events,.combine='rbind',.errorhandling='remove',.verbose=TRUE,
+                      .packages=c('dplyr','raster','rgdal','sp','adehabitat','adehabitatLT','geosphere')) %dopar% {
+  
         OBJ<-Summarize.at.point(x,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,resTTIME,
                                 NPoints,SubSamp,Theta,StepSize,TurnSens,species,Timezone,outWS)
         return(OBJ)
@@ -80,7 +87,8 @@ for(XX in 1:100){
       nevn.i<-which(k$X.event==0)
       nevets<-sample(nevn.i,size=length(events),replace=FALSE)
       
-      NEvents<-foreach(x=nevets,.combine='rbind',.errorhandling='remove') %do% {
+      NEvents<-foreach(x=nevets,.combine='rbind',.errorhandling='remove',.verbose=TRUE,
+                       .packages=c('dplyr','raster','rgdal','sp','adehabitat','adehabitatLT','geosphere')) %dopar% { 
         OBJ2<-Summarize.at.point(x,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,resTTIME,
                                  NPoints,SubSamp,Theta,StepSize,TurnSens,species,Timezone,outWS)
         return(OBJ2)
@@ -146,15 +154,15 @@ for(XX in 1:100){
     print(paste(DistBuff,PCCzero,PCCone,sep=","))
     
     ROW<-c(DistBuff,PCCzero,PCCone,XX)
-    write(ROW,file = "C:/Temp/LOG3.txt",ncolumns=4,append=TRUE,sep = ",")
+    write(ROW,file = "C:/Temp/LOG4.txt",ncolumns=4,append=TRUE,sep = ",")
   }
 
   
 }
 
+stopCluster(cl)
 
-
-Data.Tab<-tbl_df(read.table("C:/Temp/LOG3.txt",sep=",",header=F))
+Data.Tab<-tbl_df(read.table("C:/Temp/LOG4.txt",sep=",",header=F))
 
 names(Data.Tab)<-c("resolution","pcczero","pccone","run")
 

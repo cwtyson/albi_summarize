@@ -4,13 +4,13 @@ source('C:/Users/Grant/Dropbox/GrantHumphriesBackup/Projects/Albatross/Codes/alb
 #WorDir<-"C:/Users/Grant/Dropbox/GrantHumphriesBackup/Projects/Albatross/WAAL/individuals/"
 #outDir<-"C:/Users/Grant/Dropbox/GrantHumphriesBackup/Projects/Albatross/BBAL/analysis/"
 
-WorDir<-"C:/Users/Grant/Dropbox/GrantHumphriesBackup/Projects/Albatross/WAAL/individuals/"
-outDir<-"C:/Users/Grant/Dropbox/GrantHumphriesBackup/Projects/Albatross/WAAL/analysis/"
+WorDir<-"C:/Users/Grant/Dropbox/GrantHumphriesBackup/Projects/Albatross/BBAL/individuals/"
+outDir<-"C:/Users/Grant/Dropbox/GrantHumphriesBackup/Projects/Albatross/BBAL/analysis/"
 
-filePattern="WAAL"
+filePattern="BBAL"
 Resamp<-120
-timezone<-2
-species<-"WAAL"
+timezone<-1
+species<-"BBAL"
 resmp<-1
 summarize<-1
 
@@ -25,7 +25,7 @@ source('C:/Users/Grant/Dropbox/GrantHumphriesBackup/Projects/Albatross/Codes/alb
 WorDir<-"C:/Users/Grant/Dropbox/GrantHumphriesBackup/Projects/Albatross/WAAL/individuals/"
 outDir<-"C:/Users/Grant/Dropbox/GrantHumphriesBackup/Projects/Albatross/WAAL/analysis/"
 filePattern="WAAL"
-Resamp<-300
+Resamp<-10
 timezone<-2
 species<-"WAAL"
 resmp<-1
