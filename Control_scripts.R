@@ -8,14 +8,14 @@ WorDir<-"C:/Users/Grant/Dropbox/GrantHumphriesBackup/Projects/Albatross/BBAL/ind
 outDir<-"C:/Users/Grant/Dropbox/GrantHumphriesBackup/Projects/Albatross/BBAL/analysis/"
 
 filePattern="BBAL"
-Resamp<-120
+Res<-120
 timezone<-1
 species<-"BBAL"
 resmp<-1
 summarize<-1
 
 
-streamlined(WorDir,outDir,Resamp,timezone,species,resmp,summarize,filePattern)
+streamlined(WorDir,outDir,Res,timezone,species,resmp,summarize,filePattern)
 
 
 

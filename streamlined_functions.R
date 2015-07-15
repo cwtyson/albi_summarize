@@ -71,8 +71,8 @@ resample <- function(Data, setTZ, Res, WD, outWD){
 
     alldiff<-abs(difftime(X2.T,X.T))
     Index<-which(alldiff==min(alldiff))
-    #print(Index)
-    
+    Index<-Index[1]
+
     ROW<-data.frame(LocalDateTime=X2.T,X.event=0,X[Index,VARLIST])
     
     X3<-rbind(X3,ROW)
@@ -137,6 +137,7 @@ resample <- function(Data, setTZ, Res, WD, outWD){
     EvTime<-X.T[j]
     alldiff<-abs(difftime(EvTime,X2.Tm))
     Event<-which(alldiff==min(alldiff))
+    Event<-Event[1]
     Trck$X.event[Event]<-1
   }
   
@@ -650,7 +651,7 @@ streamlined <- function (WD, outWD, Res, timezone, species, resmp = 1, summarize
       
       ## Hard coded arguments
       TmBuff<-1300
-      DistBuff<-15000   #### AT 120 sec resolution, only capturing a few points because birds are flying fast! 
+      DistBuff<-25000   #### AT 120 sec resolution, only capturing a few points because birds are flying fast! 
       EndDist<-20000
       fptRad<-5000    
       resTRad<-500
