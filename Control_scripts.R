@@ -11,7 +11,7 @@ filePattern="BBAL"
 Res<-120
 timezone<-1
 species<-"BBAL"
-resmp<-1
+resmp<-0
 summarize<-1
 
 

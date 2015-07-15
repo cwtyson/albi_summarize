@@ -13,9 +13,10 @@ library(foreach)
 library(doSNOW)
 library(doParallel)
 library(raster)
+library(zoo)
 
 
-resample <- function(Data, setTZ, Res, WD, outWD){
+resample <- function(Data, setTZ, Res, WD, outWD,species,fptRad,resTRad,resTTIME){
   
   VARLIST<-c("X.Latitude","X.Longitude","X.Speed","Uplift","SWH","Charn","Bathy","Dist_to_coast","X10MWind",
              "MWD","SST","SLP","MWP","MetWind","WindDifferential","WindDirToFlight","Period")
@@ -103,9 +104,41 @@ resample <- function(Data, setTZ, Res, WD, outWD){
   Tm3<-as.POSIXct(strptime(Trck$LocalDateTime,format="%Y-%m-%d %H:%M:%S",tz=setTZ),format ="%Y-%m-%d %H:%M:%S",tz=setTZ)
   
   Z3<-project(cbind(Trck$X.Longitude,Trck$X.Latitude), "+proj=utm +zone=42 ellps=WGS84")    
-  M3<-data.frame(as.ltraj(Z3,Tm3,"id"))
   
+  Trck$ID<-species
+  M3<-as.ltraj(Z3,Tm3,id=Trck$ID)
   
+  print("-----------------------------------------------------------------------")
+  print("Now calculating first passage time and residence time")
+  print("-----------------------------------------------------------------------")
+  
+  # Calculates first passage time for the track
+  N<-fpt(M3,fptRad)
+  
+  # Calcluates residence time for the track
+  A<-residenceTime(M3,radius=resTRad,maxt=resTTIME,units="seconds")
+  
+  ## Appends FPT and RESIDENCE TIME to the original data frame
+  # This command is in here because FPT and RES can be sensitive to changes
+  
+  P<-c(Trck,tbl_df(N[[1]]))
+  Q<-c(P,tbl_df(A[[1]][2]))
+  
+  Trck<-tbl_df(as.data.frame(Q))
+  
+  names(Trck)[length(names(Trck))]<-"resT"
+  names(Trck)[length(names(Trck))-1]<-"fpt"
+  
+  ### We add a spline here to help remove NAs where they occu
+    
+  Trck[,"resT"]<-abs(na.spline(Trck[,"resT"]))
+  Trck[,"fpt"]<-abs(na.spline(Trck[,"fpt"]))
+  
+  ### Change the last 10 points to remove the error (they are over-inflated)
+  Trck[(nrow(Trck)-10):nrow(Trck),"resT"]<-mean(Trck$resT,na.rm=TRUE)
+  Trck[(nrow(Trck)-10):nrow(Trck),"fpt"]<-mean(Trck$fpt,na.rm=TRUE)
+  
+  M3<-data.frame(M3)
   Trck$TurnAngles=round(M3$rel.angle*180/pi, 2)
   
   
@@ -141,6 +174,7 @@ resample <- function(Data, setTZ, Res, WD, outWD){
     Trck$X.event[Event]<-1
   }
   
+    
   
   ################################################################################
   ###### Write the output table ######
@@ -205,7 +239,7 @@ circMean<-function(input){
 }
 
 
-Summarize.at.point<-function(Index,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,resTTIME,NPoints,SubSamp,Theta,StepSize,TurnSens,species,timezone,outWD){
+Summarize.at.point<-function(Index,Data,TmBuff,DistBuff,EndDist,NPoints,SubSamp,Theta,StepSize,TurnSens,species,timezone,outWD){
     
   ## Set timezone
   setTZ <- ifelse(timezone == 1,"Indian/Maldives",ifelse(timezone == 2,"Indian/Mahe", stop("No time zone set") ))
@@ -223,28 +257,7 @@ Summarize.at.point<-function(Index,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,r
   
   
   X<-tbl_df(read.table(FREAD,sep=",",header=T))
-  X$ID<-species
   
-  Tm<-as.POSIXct(strptime(X$LocalDateTime,format="%Y-%m-%d %H:%M:%S",tz=setTZ),format ="%Y-%m-%d %H:%M:%S",tz=setTZ)
-  Z<-project(cbind(X$X.Longitude,X$X.Latitude), "+proj=utm +zone=39 ellps=WGS84")    
-  M<-as.ltraj(Z,Tm,id=X$ID)
-  
-  # Calculates first passage time for the track
-  N<-fpt(M,fptRad)
-  
-  # Calcluates residence time for the track
-  A<-residenceTime(M,radius=resTRad,maxt=resTTIME,units="seconds")
-  
-  ## Appends FPT and RESIDENCE TIME to the original data frame
-  # This command is in here because FPT and RES can be sensitive to changes
-  
-  P<-c(X,tbl_df(N[[1]]))
-  Q<-c(P,tbl_df(A[[1]][2]))
-  
-  X<-tbl_df(as.data.frame(Q))
-  
-  names(X)[length(names(X))]<-"resT"
-  names(X)[length(names(X))-1]<-"fpt"
   
   ########################################################################
   ###### This section sets up the 10 sec tracks for data extraction ######
@@ -608,6 +621,19 @@ streamlined <- function (WD, outWD, Res, timezone, species, resmp = 1, summarize
   ## resmp - resample the data? (1 = yes)
   ## summarize - summarize the data? (1 = yes)
   ## filePattern - character sequence used to pick out files in workspace (e.g. "GPS") (character string)
+  ## Hard coded arguments
+  TmBuff<-1300
+  DistBuff<-25000   #### AT 120 sec resolution, only capturing a few points because birds are flying fast! 
+  EndDist<-20000
+  fptRad<-800    
+  resTRad<-500
+  resTTIME<-50
+  NPoints <-9
+  SubSamp<-120
+  Theta<-0.7
+  StepSize<-2
+  TurnSens<-60
+ 
   
   ## Set working directory and get files to process
   setwd(WD)
@@ -621,7 +647,7 @@ streamlined <- function (WD, outWD, Res, timezone, species, resmp = 1, summarize
     ## For each data.frame resample at current resolution
     for(Data in BirdList){
       ## For each data.frame, resample
-      resample(Data, setTZ, Res, WD, outWD)
+      resample(Data, setTZ, Res, WD, outWD,species,fptRad,resTRad,resTTIME)
     }
   }
   
@@ -649,18 +675,7 @@ streamlined <- function (WD, outWD, Res, timezone, species, resmp = 1, summarize
       
       SEQ<-seq(10,nrow(bird),by=1)
       
-      ## Hard coded arguments
-      TmBuff<-1300
-      DistBuff<-25000   #### AT 120 sec resolution, only capturing a few points because birds are flying fast! 
-      EndDist<-20000
-      fptRad<-5000    
-      resTRad<-500
-      resTTIME<-50
-      NPoints <-9
-      SubSamp<-120
-      Theta<-0.7
-      StepSize<-2
-      TurnSens<-60
+
       #
       # Call summarize.at.point function
       d<-foreach(Index=SEQ,.combine='rbind',.verbose=TRUE,.errorhandling = 'remove',.packages=c('dplyr','raster','rgdal','sp','adehabitat','adehabitatLT','geosphere'))%dopar%{    #
@@ -668,7 +683,7 @@ streamlined <- function (WD, outWD, Res, timezone, species, resmp = 1, summarize
         #print(Index)
         #writeLines(as.character(Index),"C:/Temp/log.txt")
         cat(as.character(Index),"\n")
-        Summarize.at.point(Index,Data,TmBuff,DistBuff,EndDist,fptRad,resTRad,resTTIME,NPoints,SubSamp,Theta,StepSize,TurnSens,species, timezone,outWD)
+        Summarize.at.point(Index,Data,TmBuff,DistBuff,EndDist,NPoints,SubSamp,Theta,StepSize,TurnSens,species, timezone,outWD)
       }
       
       NewDat<-bird[d[,"Eindex"],]
